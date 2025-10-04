@@ -1,0 +1,84 @@
+version: '3.8'
+
+# Define the services
+services:
+  # Define the dind service, which is used to run the docker daemon in the container
+  dind:
+    image: docker:dind
+    user: root
+    privileged: true
+    container_name: dind
+    ports:
+      # 2375 is the default port for the docker daemon without TLS
+      # Use 2376 to connect to the docker daemon from the jenkins service with TLS
+      - 2376:2376
+    networks:
+      # Define the network for the dind service
+      # The alias name is used to connect to the docker daemon from the jenkins service with TLS
+      jenkins-dind:
+        aliases:
+          - docker
+    environment:
+      # The DOCKER_TLS_CERTDIR environment variable is used to store the ca certificate for the docker daemon
+      - DOCKER_TLS_CERTDIR=/certs
+    volumes:
+      # The docker-certs-ca volume is used to store the ca certificate for the docker daemon
+      # The docker-certs-client volume is used to store the client certificate for the docker daemon
+      # The docker-cache volume is used to store the docker cache
+      # The jenkins-home volume is used to store the jenkins home directory
+      - docker-certs-ca:/certs/ca
+      - docker-certs-client:/certs/client
+      - docker-cache:/var/lib/docker
+      - jenkins-home:/var/jenkins_home
+
+  # Define the jenkins service, which is used to run the jenkins server in the container
+  jenkins:
+    # Build the jenkins image from the Dockerfile and tag it as jenkins_custom
+    # 1.Install the needed plugins
+    # 2.Copy the jenkins.yaml file to the container which is used to configure security
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - jenkins_custom
+    user: root
+    container_name: jenkins
+    restart: unless-stopped
+    # Define the dependencies for the jenkins service
+    depends_on:
+      - dind
+    ports:
+      - 8080:8080
+      - 50000:50000
+    volumes:
+      # The jenkins-home volume is used to store the jenkins home directory
+      # The docker-certs-client volume is used to store the client certificate for the docker daemon
+      # The /usr/bin/docker volume is used to run the docker command
+      - jenkins-home:/var/jenkins_home
+      - docker-certs-client:/certs/client:ro
+      - /usr/bin/docker:/usr/bin/docker
+    environment:
+      # The DOCKER_HOST environment variable is used to connect to the docker daemon
+      # The DOCKER_TLS_VERIFY environment variable is used to verify the docker daemon
+      # The DOCKER_CERT_PATH environment variable is used to store the client certificate for the docker daemon
+      # The JENKINS_ADMIN_PASSWORD environment variable is used to store the admin password for the jenkins server
+      # The JENKINS_PIPELINE_PASSWORD environment variable is used to store the pipeline password for the jenkins server
+      - DOCKER_HOST=tcp://docker:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_CERT_PATH=/certs/client
+      - JENKINS_ADMIN_PASSWORD=admin_password
+      - JENKINS_PIPELINE_PASSWORD=pipeline_password
+    networks:
+      - jenkins-dind
+
+# Define the volumes to store the data
+volumes:
+  docker-certs-ca:
+  docker-certs-client:
+  docker-cache:
+  jenkins-home:
+
+# Define the networks to connect the services
+networks:
+  jenkins-dind:
+    driver: bridge

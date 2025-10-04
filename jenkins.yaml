@@ -1,0 +1,17 @@
+jenkins:
+  systemMessage: "Jenkins configured as code!"
+  securityRealm:
+    local:
+      # Disable signup
+      allowsSignup: false
+      # Define the users/passwords for the jenkins server
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+        # Create a non-admin user for pipeline
+        - id: "pipeline"
+          password: "${JENKINS_PIPELINE_PASSWORD}"
+  authorizationStrategy:
+    # Allow only logged in users to do anything, disable anonymous access
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
